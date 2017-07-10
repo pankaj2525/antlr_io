@@ -1,65 +1,198 @@
+import static com.config.ConfigurationUtils.GRAMMAR_FOLDER;
+import static com.config.ConfigurationUtils.GRAMMAR_RULE_NAME;
+import static com.config.ConfigurationUtils.GRAMMAR_NAME;
+import static com.config.ConfigurationUtils.getProperty;
+import static com.config.ConfigurationUtils.loadConfiguration;
+
+import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Properties;
+import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.antlr.v4.Tool;
+import org.antlr.v4.gui.TestRig;
+import org.antlr.v4.runtime.ANTLRInputStream;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.tool.ErrorType;
 
 public class Demo {
 
-	static final Properties configProperties = new Properties();
-	static final String GRAMMAR_FOLDER_INPUT = "antlr.grammar.folder";
+	
 
-	private static void loadConfiguration(String[] args) throws Exception {
-		String file = null;;
-		for (int i = 0; i < (args.length - 1); i++) {
-			if (args[i].equals("--configpath")) {
-				if (args[i + 1] != null && new File(args[i + 1].trim()).isFile()) {
-					file = args[i + 1] ;
-
-				}
-				break;
-			}
-		}
-		if (file==null || file.trim() == "") {
-
-			throw new Exception(
-					"specify --configpath as command line argument followed by path to configuration file..\n e.g --configpath /home/filename.properties");
-		}
-		InputStream inputStream = null;
-
-		try {
-
-			inputStream = new FileInputStream(file);
-
-			// load a properties file
-			configProperties.load(inputStream);
-
-			// get the property value and print it out
-			System.out.println(configProperties.getProperty(GRAMMAR_FOLDER_INPUT));
-
-		} catch (IOException ex) {
-			ex.printStackTrace();
-		} finally {
-			if (inputStream != null) {
-				try {
-					inputStream.close();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-		}
-	}
+	
 
 	public static void main(String[] args) throws Exception {
 		loadConfiguration(args);
-		String[] input = new String[4];
-		String outputPath = "/home/synerzip/antlr4-ws/antlr4-dev";
-		input[0] = "-o";
-		input[1] = outputPath;
-		input[2] = "/home/synerzip/source-code/pankaj-repos/ANTLR/MONGOLexer.g4";
-		input[3] = "/home/synerzip/source-code/pankaj-repos/ANTLR/MONGOParser.g4";
-		Tool.main(input);
+		String[] toolInputArgs = getToolInputArgs(); 
+		Tool antlr = new Tool(toolInputArgs);
+        if ( args.length == 0 ) { antlr.help(); antlr.exit(0); }
+
+        try {
+            antlr.processGrammarsOnCommandLine();
+        }
+        finally {
+            if ( antlr.log ) {
+                try {
+                    String logname = antlr.logMgr.save();
+                    System.out.println("wrote "+logname);
+                }
+                catch (IOException ioe) {
+                    antlr.errMgr.toolError(ErrorType.INTERNAL_ERROR, ioe);
+                }
+            }
+        }
+        try
+        {            
+            Runtime rt = Runtime.getRuntime();
+            List<String> cmd = new ArrayList<String>();
+            //cmd.add("export");
+            
+            cmd.add("javac");
+            cmd.add("-cp");
+            cmd.add(".:/usr/local/lib/antlr-4.7-complete.jar");
+            cmd.add("/home/synerzip/source-code/pankaj-repos/antlr_io/grammar/MONGOParserListener.java");
+            cmd.add("/home/synerzip/source-code/pankaj-repos/antlr_io/grammar/MONGOLexer.java");
+            cmd.add("/home/synerzip/source-code/pankaj-repos/antlr_io/grammar/MONGOParser.java");
+            
+            cmd.add("/home/synerzip/source-code/pankaj-repos/antlr_io/grammar/MONGOParserBaseListener.java");
+           
+            Process proc =rt.exec(cmd.toArray(new String[cmd.size()])) ;//rt.exec("javac -cp .:/usr/local/lib/antlr-4.5.3-complete.jar /home/synerzip/source-code/pankaj-repos/antlr_io/grammar/MONGOParser.java");
+            int exitVal = proc.waitFor();
+            System.out.println("Process exitValue: " + exitVal);
+            int len;
+            if ((len = proc.getErrorStream().available()) > 0) {
+              byte[] buf = new byte[len]; 
+              proc.getErrorStream().read(buf); 
+              System.err.println("Command error:\t\""+new String(buf)+"\""); 
+            }
+        } catch (Throwable t)
+          {
+            t.printStackTrace();
+          }
+        
+		String ruleName =getProperty( GRAMMAR_RULE_NAME);
+		String grammarName =getProperty( GRAMMAR_NAME);
+		String[] grunArgs= new String[]{grammarName,ruleName,"tree"}; 
+		//TestRig.main(grunArgs);
+		try
+        {            
+            Runtime rt = Runtime.getRuntime();
+            List<String> cmd = new ArrayList<String>();
+            //cmd.add("export");
+            
+            cmd.add("java");
+            cmd.add("-cp");
+            cmd.add(".:/usr/local/lib/antlr-4.7-complete.jar:/home/synerzip/source-code/pankaj-repos/antlr_io/grammar/");
+            cmd.add("org.antlr.v4.gui.TestRig");
+            cmd.add(grammarName);
+            cmd.add(ruleName);
+            
+            cmd.add("/home/synerzip/source-code/pankaj-repos/antlr_io/grammar/input.txt");
+            cmd.add("-tree");
+            Process proc =rt.exec(cmd.toArray(new String[cmd.size()])) ;//rt.exec("javac -cp .:/usr/local/lib/antlr-4.5.3-complete.jar /home/synerzip/source-code/pankaj-repos/antlr_io/grammar/MONGOParser.java");
+            int exitVal = proc.waitFor();
+            System.out.println("Process exitValue: " + exitVal);
+            int len;
+            if ((len = proc.getErrorStream().available()) > 0) {
+              byte[] buf = new byte[len]; 
+              proc.getErrorStream().read(buf); 
+              System.err.println("Command error:\t\""+new String(buf)+"\""); 
+            }
+            InputStream is = proc.getInputStream();
+            InputStreamReader isr = new InputStreamReader(is);
+            BufferedReader buff = new BufferedReader (isr);
+
+            String line;
+            while((line = buff.readLine()) != null)
+                System.out.print(line);
+            
+        } catch (Throwable t)
+          {
+            t.printStackTrace();
+          }
+	}
+	private static void compileJavaFiles() throws Exception{
+		List<String> javaFiles = getJavaFilesForCompilation();
+		try
+        {            
+            Runtime rt = Runtime.getRuntime();
+            List<String> cmd = new ArrayList<String>();
+            //cmd.add("export");
+            
+            cmd.add("javac");
+            cmd.add("-cp");
+            cmd.add(".:/usr/local/lib/antlr-4.7-complete.jar");
+			for (String file : javaFiles) {
+				cmd.add(file.trim());
+
+			}
+           //  cmd.add("/home/synerzip/source-code/pankaj-repos/antlr_io/grammar/MONGOLexer.java");
+           // cmd.add("/home/synerzip/source-code/pankaj-repos/antlr_io/grammar/MONGOParser.java");
+            
+           // cmd.add("/home/synerzip/source-code/pankaj-repos/antlr_io/grammar/MONGOParserBaseListener.java");
+           
+            Process proc =rt.exec(cmd.toArray(new String[cmd.size()])) ;//rt.exec("javac -cp .:/usr/local/lib/antlr-4.5.3-complete.jar /home/synerzip/source-code/pankaj-repos/antlr_io/grammar/MONGOParser.java");
+            int exitVal = proc.waitFor();
+            System.out.println("Process exitValue: " + exitVal);
+            int len;
+            if ((len = proc.getErrorStream().available()) > 0) {
+              byte[] buf = new byte[len]; 
+              proc.getErrorStream().read(buf); 
+              System.err.println("Command error:\t\""+new String(buf)+"\""); 
+            }
+        } catch (Throwable t)
+          {
+            t.printStackTrace();
+            throw t;
+          }
+		
+		
+	}
+	private static List<String> getJavaFilesForCompilation() throws Exception {
+		List<String> javaFiles = new ArrayList<>();
+		Files.find(Paths.get(getProperty(GRAMMAR_FOLDER)), 999, (p, bfa) -> bfa.isRegularFile()).forEach(f -> {
+
+			String path = f.toAbsolutePath().toString();
+			System.out.println("java file : " + path);
+			String fileName = f.getFileName().toString();
+			String extension = fileName.substring(fileName.lastIndexOf(".") + 1, fileName.length());
+			if ("java".equals(extension)) {
+				javaFiles.add(path);
+			}
+		});
+		return javaFiles;
+	}
+
+	private static String[] getToolInputArgs() throws Exception {
+		String grammarPath = getProperty(GRAMMAR_FOLDER);
+		List<String> arguments = new ArrayList<>();
+		arguments.add("-o");
+		arguments.add(grammarPath);
+
+		
+
+		Files.find(Paths.get(grammarPath), 999, (p, bfa) -> bfa.isRegularFile()).forEach(f -> {
+
+			String path = f.toAbsolutePath().toString();
+			System.out.println(path);
+			String fileName = f.getFileName().toString();
+			String extension = fileName.substring(fileName.lastIndexOf(".") + 1, fileName.length());
+			if ("g4".equals(extension)) {
+				arguments.add(path);
+			}
+		});
+		int argLength = 0;
+		String[] input = new String[arguments.size()];
+		for (String item : arguments) {
+			input[argLength++] = item;
+		}
+
+		return input;
 	}
 }
