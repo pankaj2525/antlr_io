@@ -1,2 +1,2 @@
-db.ss.find({})
+db.dd.find({})
 
